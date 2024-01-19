@@ -1,0 +1,9 @@
+.MuiTableCell-sizeSmall {
+  width: 170px !important;
+}
+.footer-button {
+  display: flex;
+  flex-direction: row-reverse;
+  margin-right: 75px;
+  margin-top: 25px;
+}

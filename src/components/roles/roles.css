@@ -1,0 +1,9 @@
+.check-list ul li {
+  list-style: none;
+}
+
+.update-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

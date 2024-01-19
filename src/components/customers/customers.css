@@ -1,0 +1,19 @@
+.MuiTableCell-sizeSmall {
+  width: 170px !important;
+}
+.view-button {
+  margin: "7px";
+  cursor: "pointer";
+}
+
+.form-input {
+  margin: 7px 0px;
+}
+
+.dzu-submitButton {
+  display: none;
+}
+.dzu-previewImage {
+  max-height: 200px;
+  max-width: 200px;
+}

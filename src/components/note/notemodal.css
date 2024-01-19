@@ -1,0 +1,10 @@
+.single-note {
+  background: "#2ba5b6";
+  color: "white";
+  height: "230px";
+  border-radius: "5px";
+  padding: "10px";
+  text-align: "right";
+  width: "200px";
+  margin: "10px";
+}

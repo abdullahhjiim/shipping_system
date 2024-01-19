@@ -1,0 +1,613 @@
+import CancelIcon from "@material-ui/icons/Cancel";
+import DeleteIcon from "@material-ui/icons/Delete";
+import EditIcon from "@material-ui/icons/Edit";
+import EyeIcon from "@material-ui/icons/RemoveRedEye";
+import SearchIcon from "@material-ui/icons/Search";
+import React, { useEffect, useState } from "react";
+import Spinner from "react-bootstrap/Spinner";
+import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import Select from "react-select";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import languageStrings from "../../localization/language";
+import MyPagination from "../../pagination/MyPagination";
+import * as CityService from "../../services/CityService";
+import * as countryService from "../../services/CountryService";
+import Popup from "../popup/Popup";
+import "./cities.css";
+import CityForm from "./CityForm";
+import CityView from "./CityView";
+
+const statusItems = [
+  { title: "" },
+  { title: "Active", id: 1 },
+  { title: "Inactive", id: 2 },
+];
+
+const textFilterInitialValues = {
+  name: "",
+  short_code: "",
+};
+const selectFilterInitialValues = {
+  country_id: "",
+  status: "",
+};
+
+function Cities() {
+  const authData = useSelector((state) => state.auth);
+
+  // eslint-disable-next-line no-unused-vars
+  const [state, setState] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [buttonDisabled, setButtonDisabled] = useState(false);
+  const [cities, setCities] = useState([]);
+  const [metaData, setMetaData] = useState({});
+  const [count, setCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [openPopup, setOpenPopup] = useState(false);
+  const [viewPopup, setViewPopup] = useState(false);
+  const [recordForView, setRecordForView] = useState(null);
+  const [recordForEdit, setRecordForEdit] = useState(null);
+  const [globalSearchValue, setGlobalSearchValue] = useState("");
+  const [textFilterValues, setTextFilterValues] = useState(
+    textFilterInitialValues
+  );
+  const [selectFilterValues, setSelectFilterValues] = useState(
+    selectFilterInitialValues
+  );
+  const [filterUrls, setFilterUrls] = useState(null);
+
+  const [countryItems, setCountry] = useState([]);
+
+  const [countryValue, setCountryValue] = useState({
+    label: "Select Country",
+  });
+
+  useEffect(() => {
+    const getcountry = () => {
+      countryService.getAllCountriesFor().then((response) => {
+        setCountry(
+          response.data.map((i) => {
+            return { ...i, label: i.name, value: i.id };
+          })
+        );
+      });
+    };
+    getcountry();
+  }, []);
+
+  useEffect(() => {
+    const getCities = (page) => {
+      setLoading(true);
+      CityService.getCities(page)
+        .then((response) => {
+          setCities(response.data.data);
+          setCount(response.data.meta.last_page);
+          setMetaData(response.data.meta);
+          setLoading(false);
+          setSearchLoading(false);
+        })
+        .catch((err) => {
+          toastMessageShow("error", "Something went Wrong !!!");
+          setLoading(false);
+        });
+    };
+
+    let restUrl = `?page=${currentPage}`;
+
+    if (filterUrls) {
+      restUrl += filterUrls;
+    }
+
+    getCities(restUrl);
+    return () => {
+      setState({});
+    };
+  }, [currentPage, filterUrls]);
+
+  const getAllCities = (page) => {
+    CityService.getCities(page)
+      .then((response) => {
+        setCities(response.data.data);
+        setCount(response.data.meta.last_page);
+        setMetaData(response.data.meta);
+        setLoading(false);
+      })
+      .catch((err) => {});
+  };
+  useEffect(() => {
+    let filterUrl = "";
+    Object.keys(selectFilterValues).forEach((item) => {
+      if (selectFilterValues[item]) {
+        filterUrl += `&${item}=${selectFilterValues[item]}`;
+      }
+    });
+
+
+    if (filterUrl) {
+      setFilterUrls(filterUrl);
+    }
+    return () => {
+      setState({});
+    };
+  }, [selectFilterValues]);
+
+  const addEditRecord = (id, type) => {
+    setOpenPopup(true);
+    setRecordForEdit(null);
+  };
+
+  const handleClick = (e, rowData, type) => {
+    if (type === "edit") {
+      setRecordForEdit(rowData);
+      setOpenPopup(true);
+    } else if (type === "delete") {
+      if (window.confirm("Are your sure to delete..??")) {
+        CityService.deleteCity(rowData)
+          .then((response) => {
+            toastMessageShow("success", response.data.message);
+            getAllCities("?page=1");
+          })
+          .catch((err) => {
+            toastMessageShow("error", "Something went Wrong !!!");
+          });
+      }
+    } else if (type === "view") {
+      setViewPopup(true);
+      setRecordForView(rowData);
+    }
+  };
+
+  const addOrEdit = (city, resetForm) => {
+    setButtonDisabled(true);
+    if (city.id === 0) {
+      CityService.insertCity(city)
+        .then((response) => {
+          toastMessageShow("success", response.data.message);
+          getAllCities("?page=1");
+          formClear(resetForm);
+        })
+        .catch((err) => {
+          toastMessageShow("error", "Something went Wrong  !!!");
+          formClear(resetForm);
+        });
+    } else {
+      CityService.updateCity(city)
+        .then((response) => {
+          toastMessageShow("success", response.data.message);
+          getAllCities("?page=1");
+          formClear(resetForm);
+        })
+        .catch((err) => {
+          toastMessageShow("error", "Something went Wrong !!!");
+          formClear(resetForm);
+        });
+    }
+  };
+
+  const formClear = (callback) => {
+    callback();
+    setRecordForEdit(null);
+    setOpenPopup(false);
+    setButtonDisabled(false);
+  };
+
+  const searchHandleCancel = () => {
+    setTextFilterValues(textFilterInitialValues);
+    setSelectFilterValues(selectFilterInitialValues);
+    setFilterUrls(null);
+    setCountryValue({
+      label: "Select Country",
+    });
+  };
+
+  const searchHandleClick = () => {
+    let filterUrl = "";
+    Object.keys(selectFilterValues).forEach((item) => {
+      if (selectFilterValues[item]) {
+        filterUrl += `&${item}=${selectFilterValues[item]}`;
+      }
+    });
+
+    Object.keys(textFilterValues).forEach((item) => {
+      if (textFilterValues[item]) {
+        filterUrl += `&${item}=${textFilterValues[item]}`;
+      }
+    });
+
+    if (filterUrl) {
+      setFilterUrls(filterUrl);
+    }
+  };
+
+  const handleSelectFilter = (e) => {
+    const { name, value } = e.target;
+    setSelectFilterValues({
+      ...selectFilterValues,
+      [name]: value,
+    });
+  };
+
+  const handleTextFilter = (e) => {
+    const { name, value } = e.target;
+    setTextFilterValues({
+      ...textFilterValues,
+      [name]: value,
+    });
+  };
+
+  const enterSearch = (e) => {
+    if (e.key === "Enter" || e.keyCode === 13) {
+      searchHandleClick();
+    }
+  };
+
+  const globalSearchClick = () => {
+    if (globalSearchValue) {
+      setSearchLoading(true);
+      setFilterUrls(`&city_global_search=${globalSearchValue}`);
+      if (filterUrls === `&city_global_search=${globalSearchValue}`) {
+        setSearchLoading(false);
+      }
+    } else {
+      setCurrentPage(1);
+      setFilterUrls(``);
+    }
+  };
+
+  const handleGlobalSearch = (e) => {
+    if (e.key === "Enter") {
+      if (globalSearchValue) {
+        setSearchLoading(true);
+        setFilterUrls(`&city_global_search=${globalSearchValue}`);
+        if (filterUrls === `&city_global_search=${globalSearchValue}`) {
+          setSearchLoading(false);
+        }
+      } else {
+        setCurrentPage(1);
+        setFilterUrls(``);
+      }
+    }
+  };
+
+  const pageChange = (page) => {
+    if (page !== currentPage) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleCountry = (e) => {
+    if (e) {
+      setCountryValue(e);
+      setSelectFilterValues({
+        ...selectFilterValues,
+        country_id: e.value,
+      });
+    } else {
+      setCountryValue(e);
+      setSelectFilterValues({
+        ...selectFilterValues,
+        country_id: "",
+      });
+    }
+  };
+
+
+  const toastMessageShow = (type, message) => {
+    toast[type](message, {
+      position: "top-right",
+      autoClose: 1000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+
+  return (
+    <>
+      <div>
+        <div className="row">
+          <div className="col-xl-12">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb">
+                <li className="breadcrumb-item">
+                  <Link to="/dashboard">Home</Link>
+                </li>
+                <li className="breadcrumb-item active" aria-current="page">
+                  Cities
+                </li>
+              </ol>
+            </nav>
+            <div className="card card-height-100">
+              <div className="card-header align-items-center d-flex">
+                <h4 className="card-title mb-0 flex-grow-1">
+                  {languageStrings.cities}
+                </h4>
+                <div className="from-group" style={{ marginRight: "3px" }}>
+                  <input
+                    type="text"
+                    placeholder={languageStrings.global_search}
+                    className="form-control"
+                    value={globalSearchValue}
+                    onKeyDown={(e) => handleGlobalSearch(e)}
+                    onChange={(e) => setGlobalSearchValue(e.target.value)}
+                  />
+                </div>
+                <div className="" style={{ marginRight: "10px" }}>
+                  <button
+                    className="btn btn-success"
+                    onClick={globalSearchClick}
+                    disabled={searchLoading}
+                  >
+                    {" "}
+                    {searchLoading && <Spinner animation="border" size="sm" />}
+                    {languageStrings.search}
+                  </button>
+                </div>
+                <div className="flex-shrink-0">
+                  {authData.permissions?.["cities.store"] && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={addEditRecord}
+                    >
+                      {languageStrings.add_new}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="card-body">
+                {loading && (
+                  <div
+                    className="d-flex justify-content-center align-items-center py-5"
+                    style={{ minHeight: "400px" }}
+                  >
+                    <div className="spinner-border" role="status">
+                      <span className="sr-only">Loading...</span>
+                    </div>
+                  </div>
+                )}
+                {!loading && (
+                  <div className="table-responsive table-card">
+                    <table className="table table-centered table-hover align-middle table-nowrap mb-0">
+                      <thead>
+                        <tr>
+                          <td> # </td>
+                          <td> {languageStrings.name} </td>
+                          <td> {languageStrings.short_code} </td>
+                          <td> {languageStrings.country} </td>
+                          <td> {languageStrings.status}</td>
+                          <td> {languageStrings.action}</td>
+                        </tr>
+                        <tr>
+                          <td></td>
+                          <td>
+                            <div
+                              className="form-group"
+                              style={{ width: "130px" }}
+                            >
+                              <input
+                                type="text"
+                                name="name"
+                                onChange={handleTextFilter}
+                                onKeyUp={enterSearch}
+                                value={textFilterValues.name}
+                                className="form-control"
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              className="form-group"
+                              style={{ width: "130px" }}
+                            >
+                              <input
+                                type="text"
+                                name="short_code"
+                                onChange={handleTextFilter}
+                                onKeyUp={enterSearch}
+                                value={textFilterValues.short_code}
+                                className="form-control"
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              className="form-group"
+                              style={{ minWidth: "140px" }}
+                            >
+                              {/* <select
+                                name="state_id"
+                                onChange={handleSelectFilter}
+                                value={selectFilterValues.state_id}
+                                className="form-select form-control"
+                              >
+                                <option></option>
+                                {stateItems.map((item, index) => (
+                                  <option value={item.id} key={index}>
+                                    {item.name}
+                                  </option>
+                                ))}
+                              </select> */}
+                              <Select
+                                className="basic-single"
+                                classNamePrefix="select"
+                                defaultValue={{ label: "Country", value: 0 }}
+                                isSearchable={true}
+                                name="country"
+                                value={countryValue}
+                                options={countryItems}
+                                onChange={handleCountry}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              className="form-group"
+                              style={{ width: "130px" }}
+                            >
+                              <select
+                                name="status"
+                                onChange={handleSelectFilter}
+                                value={selectFilterValues.status}
+                                className="form-select form-control"
+                              >
+                                {statusItems.map((item, index) => (
+                                  <option value={item.id} key={index}>
+                                    {item.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td>
+                            <>
+                              <SearchIcon
+                                style={{ cursor: "pointer", margin: "7px" }}
+                                onClick={searchHandleClick}
+                              />
+                              <CancelIcon
+                                onClick={searchHandleCancel}
+                                style={{ cursor: "pointer", margin: "7px" }}
+                              />
+                            </>
+                          </td>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {!loading &&
+                          cities &&
+                          // eslint-disable-next-line array-callback-return
+                          cities.map((city) => (
+                            <tr key={city.id}>
+                              <td>
+                                <span className="text-muted">{city.id}</span>
+                              </td>
+                              <td>
+                                <p className="mb-0">{city.name}</p>
+                              </td>
+                              <td>
+                                <p className="mb-0">{city.short_code}</p>
+                              </td>
+                              <td>
+                                <p className="mb-0">{city.country}</p>
+                              </td>
+                              <td>
+                                <p className="mb-0">
+                                  <span
+                                    className={
+                                      city.status === 1
+                                        ? `badge badge-soft-success`
+                                        : `badge badge-soft-danger`
+                                    }
+                                  >
+                                    {" "}
+                                    {city.status_name}{" "}
+                                  </span>
+                                </p>
+                              </td>
+
+                              <td>
+                                <>
+                                  {authData.permissions?.["cities.view"] && (
+                                    <EyeIcon
+                                      style={{
+                                        margin: "7px",
+                                        cursor: "pointer",
+                                      }}
+                                      onClick={(e) =>
+                                        handleClick(e, city, "view")
+                                      }
+                                      className="view-button"
+                                    />
+                                  )}
+
+                                  {authData.permissions?.["cities.update"] && (
+                                    <EditIcon
+                                      style={{
+                                        margin: "7px",
+                                        cursor: "pointer",
+                                      }}
+                                      onClick={(e) =>
+                                        handleClick(e, city, "edit")
+                                      }
+                                    />
+                                  )}
+                                  {authData.permissions?.["cities.destroy"] && (
+                                    <DeleteIcon
+                                      style={{
+                                        margin: "7px",
+                                        cursor: "pointer",
+                                      }}
+                                      onClick={(e) =>
+                                        handleClick(e, city.id, "delete")
+                                      }
+                                    />
+                                  )}
+                                </>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="align-items-center mt-4 pt-2 justify-content-between d-flex">
+                  <div className="flex-shrink-0">
+                    <div className="text-muted">
+                      Showing{" "}
+                      <span className="fw-semibold">
+                        from {metaData.from} to {metaData.to}{" "}
+                      </span>
+                      of <span className="fw-semibold"> {metaData.total}</span>{" "}
+                      Results
+                    </div>
+                  </div>
+
+                  <ul className="pagination pagination-separated pagination-lg mb-0">
+                    <MyPagination
+                      count={count}
+                      currentPage={currentPage}
+                      pageChange={pageChange}
+                    />
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Popup
+          title="City Form"
+          openPopup={openPopup}
+          setOpenPopup={setOpenPopup}
+        >
+          <CityForm
+            recordForEdit={recordForEdit}
+            addOrEdit={addOrEdit}
+            buttonDisabled={buttonDisabled}
+          />
+        </Popup>
+
+        <Popup
+          title="City View"
+          openPopup={viewPopup}
+          setOpenPopup={setViewPopup}
+        >
+          <CityView recordData={recordForView} />
+        </Popup>
+
+        <ToastContainer />
+      </div>
+    </>
+  );
+}
+
+export default Cities;
